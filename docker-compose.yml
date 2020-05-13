@@ -1,0 +1,48 @@
+version: "3.3"
+services:
+    datawarehouse:
+        image: "postgres:12-alpine"
+        container_name: "xero_datawarehouse"
+        env_file:
+          - .env
+        volumes:
+          - xero-database-data:/var/lib/postgresql/data/
+        ports:
+          - "5432:5432"
+
+    dashboard:
+        build: ./
+        container_name: "xero_dashboard"
+        restart: always
+        env_file:
+          - .env
+        volumes:
+          - .:/xero
+        ports:
+          - "8050:8050"
+
+    airflow_webserver:
+        image: puckel/docker-airflow:1.10.9
+        container_name: "xero_airflow"
+        restart: always
+        environment:
+            - LOAD_EX=n
+            - AIRFLOW_HOME=/xero/
+            - AIRFLOW__CORE__BASE_LOG_FOLDER=/xero/local_airflow/logs/
+            - AIRFLOW__CORE__DAGS_FOLDER=/xero/etl/dags
+            - AIRFLOW__WEBSERVER__EXPOSE_CONFIG=True
+            - PYTHONPATH=/xero/
+        volumes:
+            - ./requirements.txt:/requirements.txt      # needed for airflow to pip install
+            - .:/xero                                   # has all libraries
+        ports:
+            - "8080:8080"
+        command: webserver
+        healthcheck:
+            test: ["CMD-SHELL", "[ -f /usr/local/airflow/airflow-webserver.pid ]"]
+            interval: 30s
+            timeout: 30s
+            retries: 3
+
+volumes:
+  xero-database-data:
